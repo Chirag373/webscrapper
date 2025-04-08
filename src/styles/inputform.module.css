@@ -1,0 +1,49 @@
+.formContainer {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.form {
+    max-width: 700px;
+    margin: 60px auto;
+    padding: 40px 30px;
+    background-color: #fff;
+    border: 1px solid #dbdbdb;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.inputField,
+.selectField {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 14px;
+    border: 1px solid #dbdbdb;
+    border-radius: 8px;
+    background-color: #fafafa;
+    transition: border 0.2s;
+    margin-bottom: 20px;
+
+}
+
+.inputField:focus,
+.selectField:focus {
+    outline: none;
+    border-color: #a8a8a8;
+    background-color: #fff;
+}
+
+.submitButton {
+    width: 100%;
+    padding: 12px;
+    background-color: #4B6F44;
+    color: white;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.submitButton:hover {
+    background-color: #87A96B;
+}

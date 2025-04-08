@@ -1,10 +1,14 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client"
+
+import InputFormContainer from "@/components/InputFormContainer";
+import Navbar from "@/components/Navbar";
+import ScrapedDataTable from "@/components/ScrapedDataTable";
 
 export default function Home() {
   return (
     <div>
-      <h1>Hello world</h1>
+      <Navbar />
+      <InputFormContainer />
     </div>
   );
 }
