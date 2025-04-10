@@ -40,8 +40,6 @@ export default function InputFormContainer() {
                     placeholder="Email Domain (e.g. @yahoo.com)"
                     className={styles.inputField}
                 />
-
-
                 <input
                     id="email3"
                     type="text"
@@ -83,7 +81,7 @@ export default function InputFormContainer() {
                     <option value="OR">OR</option>
                     <option value="AND">AND</option>
                 </select>
-                <button type="submit" className={styles.submitButton}>Scrape</button>
+                <button type="submit" className={styles.submitButton}>Scrape and Download(in .csv)</button>
             </form>
         </div>
     )
