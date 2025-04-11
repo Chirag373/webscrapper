@@ -1,6 +1,6 @@
 interface FormData {
     site: string;
-    email: string;
+    email: string[];
     profession: string;
     city: string;
     state: string;
@@ -25,10 +25,27 @@ function formatSite(site: string): string {
     return formattedSite;
 }
 
+// Format email addresses
+function formatEmailAddresses(emails: string[]): string[] {
+    return emails.map(email => {
+        let formattedEmail = email.trim();
+
+        if (!formattedEmail.startsWith('@')) {
+            formattedEmail = `@${formattedEmail}`;
+        }
+
+        if (!formattedEmail.endsWith('.com')) {
+            formattedEmail = `${formattedEmail}.com`;
+        }
+
+        return formattedEmail;
+    });
+}
+
 export function handleFormSubmit(data: FormData) {
     const formatted = {
         site: formatSite(data.site),
-        emailDomains: data.email,
+        emailDomains: formatEmailAddresses(data.email),
         profession: data.profession,
         city: data.city,
         state: data.state,
