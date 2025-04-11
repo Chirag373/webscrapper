@@ -1,20 +1,31 @@
-import React from "react";
-import { useState } from "react";
-import styles from "../styles/inputform.module.css"
+import React, { useState } from "react";
+import styles from "../styles/inputform.module.css";
+import { handleFormSubmit } from "@/utils/formHandlers";
 
 export default function InputFormContainer() {
     const [site, setSite] = useState('');
-    const [email1, setEmail1] = useState('');
-    const [email2, setEmail2] = useState('');
-    const [email3, setEmail3] = useState('');
+    const [email, setEmail] = useState('');
     const [profession, setProfession] = useState('');
     const [city, setCity] = useState('');
     const [state, setState] = useState('');
     const [logic, setLogic] = useState('OR');
 
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+
+        handleFormSubmit({
+            site,
+            email,
+            profession,
+            city,
+            state,
+            logic
+        });
+    };
+
     return (
         <div className={styles.formContainer}>
-            <form className={styles.form}>
+            <form className={styles.form} onSubmit={handleSubmit}>
                 <input
                     id="site"
                     type="text"
@@ -24,28 +35,11 @@ export default function InputFormContainer() {
                     className={styles.inputField}
                 />
                 <input
-                    id="email1"
+                    id="email"
                     type="text"
-                    value={email1}
-                    onChange={(e) => setEmail1(e.target.value)}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     placeholder="Email Domain (e.g. @gmail.com)"
-                    className={styles.inputField}
-                />
-
-                <input
-                    id="email2"
-                    type="text"
-                    value={email2}
-                    onChange={(e) => setEmail2(e.target.value)}
-                    placeholder="Email Domain (e.g. @yahoo.com)"
-                    className={styles.inputField}
-                />
-                <input
-                    id="email3"
-                    type="text"
-                    value={email3}
-                    onChange={(e) => setEmail3(e.target.value)}
-                    placeholder="Email Domain (e.g. @msn.com)"
                     className={styles.inputField}
                 />
                 <input
@@ -81,8 +75,10 @@ export default function InputFormContainer() {
                     <option value="OR">OR</option>
                     <option value="AND">AND</option>
                 </select>
-                <button type="submit" className={styles.submitButton}>Scrape and Download(in .csv)</button>
+                <button type="submit" className={styles.submitButton}>
+                    Scrape and Download (in .csv)
+                </button>
             </form>
         </div>
-    )
+    );
 }
