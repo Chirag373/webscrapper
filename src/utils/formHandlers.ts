@@ -50,15 +50,39 @@ function formatData(someData: string): string {
     return "";
 }
 
+// build the Google search query
+export function buildGoogleSearchQuery(data: FormData) {
+    const logic = data.logic?.toUpperCase() === 'AND' ? ' AND ' : ' OR ';
+
+    const emailQuery = data.email.map(domain => `"${domain}"`).join(logic);
+    const professionQuery = `"${data.profession}"`;
+    const cityQuery = `"${data.city}"`;
+    const stateQuery = `"${data.state}"`;
+
+    const queryParts = [
+        data.site, 
+        stateQuery,
+        cityQuery,
+        professionQuery,
+        emailQuery        
+    ].filter(Boolean);     
+
+    const fullQuery = queryParts.join(' '); 
+    return fullQuery;
+}
+
+
+// handle form submission
 export function handleFormSubmit(data: FormData) {
     const formatted = {
         site: formatSite(data.site),
-        emailDomains: formatEmailAddresses(data.email),
+        email: formatEmailAddresses(data.email),
         profession: formatData(data.profession),
         city: formatData(data.city),
         state: formatData(data.state),
         logic: data.logic
     };
-    console.log(formatted)
-
+    
+    const query = buildGoogleSearchQuery(formatted);
+    console.log("Formatted Data: ", query);
 }
