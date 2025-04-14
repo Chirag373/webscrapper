@@ -9,21 +9,68 @@ import {
     FormControl,
     InputLabel,
     Box,
+    CircularProgress,
+    Snackbar,
+    Alert
 } from "@mui/material";
 import { handleFormSubmit } from "@/utils/formHandlers";
 
-
 export default function InputFormContainer() {
     const [site, setSite] = useState('');
-    const [email, setEmail] = useState([]);
+    const [email, setEmail] = useState<string[]>([]);
     const [profession, setProfession] = useState('');
     const [city, setCity] = useState('');
     const [state, setState] = useState('');
     const [logic, setLogic] = useState('OR');
+    const [loading, setLoading] = useState(false);
+    const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
-    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        handleFormSubmit({ site, email, profession, city, state, logic });
+        setLoading(true);
+        
+        try {
+            const result = await handleFormSubmit({ site, email, profession, city, state, logic });
+            
+            if (result && result.success) {
+                setNotification({
+                    open: true,
+                    message: `Successfully scraped ${result.emailCount} email addresses!`,
+                    severity: 'success'
+                });
+            } else {
+                setNotification({
+                    open: true,
+                    message: result?.error || 'Failed to scrape emails',
+                    severity: 'error'
+                });
+            }
+        } catch (error) {
+            setNotification({
+                open: true,
+                message: error instanceof Error ? error.message : 'An unknown error occurred',
+                severity: 'error'
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCloseNotification = () => {
+        setNotification({ ...notification, open: false });
+    };
+
+    const addEmailDomain = (domain: string) => {
+        if (!domain) return;
+        
+        let formattedDomain = domain.trim();
+        if (!formattedDomain.startsWith('@')) {
+            formattedDomain = `@${formattedDomain}`;
+        }
+        
+        if (!email.includes(formattedDomain)) {
+            setEmail([...email, formattedDomain]);
+        }
     };
 
     return (
@@ -56,21 +103,24 @@ export default function InputFormContainer() {
             <Autocomplete
                 multiple
                 freeSolo
-                options={email}
+                options={[]}
                 value={email}
-                onChange={(event, newValue: any) => setEmail(newValue)}
+                onChange={(event, newValue: string[]) => setEmail(newValue)}
+                onInputChange={(event, value, reason) => {
+                    if (reason === 'enter' && value) {
+                        addEmailDomain(value);
+                        return '';
+                    }
+                }}
                 renderTags={(value, getTagProps) =>
-                    value.map((option, index) => {
-                        const { key, ...tagProps } = getTagProps({ index });
-                        return (
-                            <Chip
-                                key={index}
-                                label={option}
-                                variant="outlined"
-                                {...tagProps}
-                            />
-                        );
-                    })
+                    value.map((option, index) => (
+                        <Chip
+                            key={index}
+                            label={option}
+                            variant="outlined"
+                            {...getTagProps({ index })}
+                        />
+                    ))
                 }
                 renderInput={(params) => (
                     <TextField
@@ -119,13 +169,12 @@ export default function InputFormContainer() {
                     id="logic"
                     value={logic}
                     label="Logic"
-                    onChange={(e) => setLogic(e.target.value)}
+                    onChange={(e) => setLogic(e.target.value as string)}
                 >
                     <MenuItem value="OR">OR</MenuItem>
                     <MenuItem value="AND">AND</MenuItem>
                 </Select>
             </FormControl>
-
 
             <Button
                 type="submit"
@@ -133,9 +182,26 @@ export default function InputFormContainer() {
                 color="primary"
                 fullWidth
                 sx={{ mt: 2 }}
+                disabled={loading}
+                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
             >
-                Scrape and Download (.csv)
+                {loading ? 'Scraping...' : 'Scrape and Download (.csv)'}
             </Button>
+
+            <Snackbar 
+                open={notification.open} 
+                autoHideDuration={6000} 
+                onClose={handleCloseNotification}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert 
+                    onClose={handleCloseNotification} 
+                    severity={notification.severity}
+                    sx={{ width: '100%' }}
+                >
+                    {notification.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 }
