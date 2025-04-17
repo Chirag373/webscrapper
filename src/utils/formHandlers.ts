@@ -1,6 +1,5 @@
 import axios from 'axios';
 
-// Your existing form data interface
 interface FormData {
     site: string;
     email: string[];
@@ -8,85 +7,80 @@ interface FormData {
     city: string;
     state: string;
     logic: string;
+    pages?: number;
 }
 
-// Interface for the scraper response
 interface ScraperResponse {
     success: boolean;
     data?: FormData;
     error?: string;
     htmlContent?: string;
+    emails?: string[];
 }
 
-// formatted site
+function delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 function formatSite(site: string): string {
     let formattedSite = site?.toLowerCase().trim() || '';
-
     if (formattedSite && !formattedSite.startsWith('site:')) {
-        formattedSite = formattedSite.replace(/^https?:\/\//, '');
-        formattedSite = formattedSite.replace(/^www\./, '');
-
+        formattedSite = formattedSite.replace(/^https?:\/\//, '').replace(/^www\./, '');
         if (!formattedSite.includes('.')) {
             formattedSite = `${formattedSite}.com`;
         }
-
         formattedSite = `site:${formattedSite}`;
     }
-
     return formattedSite;
 }
 
-// Format email addresses
 function formatEmailAddresses(emails: string[]): string[] {
     return emails.map(email => {
         let formattedEmail = email.toLowerCase().trim();
-
-        if (!formattedEmail.startsWith('@')) {
+        if (!formattedEmail.includes('@')) {
+            if (!formattedEmail.includes('.')) {
+                formattedEmail += '.com';
+            }
             formattedEmail = `@${formattedEmail}`;
         }
-
-        if (!formattedEmail.includes('.')) {
-            formattedEmail = `${formattedEmail}.com`;
-        }
-
         return formattedEmail;
     });
 }
 
-// format profession, city, state
 function formatData(someData: string): string {
-    if (someData) {
-        return someData.toLowerCase().trim();
-    }
-    return "";
+    return someData ? someData.toLowerCase().trim() : '';
 }
 
-// build the Google search query
 export function buildGoogleSearchQuery(data: FormData): string {
     const logic = data.logic?.toUpperCase() === 'AND' ? ' AND ' : ' OR ';
-
-    const emailQuery = data.email.length > 0 ? 
-        data.email.map(domain => `"${domain}"`).join(logic) : '';
-    
+    const emailQuery = data.email.length > 0 ? data.email.map(domain => `"${domain}"`).join(logic) : '';
     const professionQuery = data.profession ? `"${data.profession}"` : '';
     const cityQuery = data.city ? `"${data.city}"` : '';
     const stateQuery = data.state ? `"${data.state}"` : '';
 
-    const queryParts = [
-        data.site, 
-        stateQuery,
-        cityQuery,
-        professionQuery,
-        emailQuery        
-    ].filter(Boolean);     
-
-    const fullQuery = queryParts.join(' '); 
-    return fullQuery;
+    const queryParts = [data.site, stateQuery, cityQuery, professionQuery, emailQuery].filter(Boolean);
+    return queryParts.join(' ');
 }
 
+async function scrapeSinglePage(query: string, startIndex: number = 0): Promise<string> {
+    const encodedQuery = encodeURIComponent(query);
+    const url = `https://www.google.com/search?q=${encodedQuery}&num=100&start=${startIndex}`;
+    const brightDataApiKey = '85714bf8ed4bf28c4d814b5edadbba80bd83b4d7f4ef73be7da6dfa7b95cdd01';
+    const brightDataZone = 'serp_api1';
 
+    const response = await axios.post(
+        'https://api.brightdata.com/request',
+        { zone: brightDataZone, url, format: 'raw' },
+        {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${brightDataApiKey}`
+            }
+        }
+    );
+    return response.data;
+}
 
-// Function to scrape search results using Bright Data API
 export async function scrapeSearchResults(data: FormData): Promise<ScraperResponse> {
     try {
         const formatted = {
@@ -95,38 +89,30 @@ export async function scrapeSearchResults(data: FormData): Promise<ScraperRespon
             profession: formatData(data.profession),
             city: formatData(data.city),
             state: formatData(data.state),
-            logic: data.logic
+            logic: data.logic,
+            pages: data.pages || 5
         };
-        
+
         const query = buildGoogleSearchQuery(formatted);
         console.log("Search Query:", query);
-        
-        const encodedQuery = encodeURIComponent(query);
-        const url = `https://www.google.com/search?q=${encodedQuery}&num=100`;
-        
-        const brightDataApiKey = '85714bf8ed4bf28c4d814b5edadbba80bd83b4d7f4ef73be7da6dfa7b95cdd01';
-        const brightDataZone = 'serp_api1';
-        
-        const response = await axios.post(
-            'https://api.brightdata.com/request',
-            {
-                zone: brightDataZone,
-                url: url,
-                format: 'raw'
-            },
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${brightDataApiKey}`
-                }
-            }
-        );
 
-        return {
-            success: true,
-            htmlContent: response.data,
-            data: response.data
-        };
+        let allEmails: string[] = [];
+        for (let i = 0; i < formatted.pages; i++) {
+            const startIndex = i * 100;
+            console.log(`Scraping page ${i + 1}, start index: ${startIndex}`);
+            try {
+                const htmlContent = await scrapeSinglePage(query, startIndex);
+                const pageEmails = extractEmailsFromHtml(htmlContent);
+                allEmails = [...allEmails, ...pageEmails];
+                console.log(`Found ${pageEmails.length} emails on page ${i + 1}`);
+                await delay(2000);
+            } catch (error) {
+                console.error(`Error scraping page ${i + 1}:`, error);
+            }
+        }
+
+        allEmails = [...new Set(allEmails)];
+        return { success: true, emails: allEmails };
     } catch (error) {
         console.error("Error scraping search results:", error);
         return {
@@ -139,7 +125,6 @@ export async function scrapeSearchResults(data: FormData): Promise<ScraperRespon
 export function extractEmailsFromHtml(html: string): string[] {
     const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
     const matches = html.match(emailRegex);
-    
     return matches ? [...new Set(matches)] : [];
 }
 
@@ -150,23 +135,21 @@ export function emailsToCsv(emails: string[]): string {
 export async function handleFormSubmit(data: FormData) {
     try {
         const scraperResponse = await scrapeSearchResults(data);
-        
-        if (!scraperResponse.success || !scraperResponse.htmlContent) {
+        if (!scraperResponse.success) {
             console.error("Failed to scrape:", scraperResponse.error);
             alert("Failed to scrape search results. Please try again.");
             return;
         }
-        
-        const emails = extractEmailsFromHtml(scraperResponse.htmlContent);
-        console.log(`Found ${emails.length} email addresses`);
-        
+
+        const emails = scraperResponse.emails || [];
+        console.log(`Found ${emails.length} unique email addresses across all pages`);
+
         if (emails.length === 0) {
             alert("No email addresses found in the search results.");
             return;
         }
-        
+
         const csvContent = emailsToCsv(emails);
-        
         const blob = new Blob([csvContent], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -176,11 +159,8 @@ export async function handleFormSubmit(data: FormData) {
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
-        
-        return {
-            success: true,
-            emailCount: emails.length
-        };
+
+        return { success: true, emailCount: emails.length };
     } catch (error) {
         console.error("Error in form submission:", error);
         alert("An error occurred during scraping. Please try again.");

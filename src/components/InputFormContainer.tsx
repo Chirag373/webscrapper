@@ -28,10 +28,10 @@ export default function InputFormContainer() {
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setLoading(true);
-        
+
         try {
             const result = await handleFormSubmit({ site, email, profession, city, state, logic });
-            
+
             if (result && result.success) {
                 setNotification({
                     open: true,
@@ -62,12 +62,12 @@ export default function InputFormContainer() {
 
     const addEmailDomain = (domain: string) => {
         if (!domain) return;
-        
+
         let formattedDomain = domain.trim();
         if (!formattedDomain.startsWith('@')) {
             formattedDomain = `@${formattedDomain}`;
         }
-        
+
         if (!email.includes(formattedDomain)) {
             setEmail([...email, formattedDomain]);
         }
@@ -107,20 +107,34 @@ export default function InputFormContainer() {
                 value={email}
                 onChange={(event, newValue: string[]) => setEmail(newValue)}
                 onInputChange={(event, value, reason) => {
-                    if (reason === 'enter' && value) {
-                        addEmailDomain(value);
-                        return '';
+                    if (value) {
+                        return value;
+                    }
+                    return '';
+                }}
+                onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                        const inputElement = event.target as HTMLInputElement;
+                        if (inputElement.value) {
+                            addEmailDomain(inputElement.value);
+                            event.preventDefault();
+                        }
                     }
                 }}
                 renderTags={(value, getTagProps) =>
-                    value.map((option, index) => (
-                        <Chip
-                            key={index}
-                            label={option}
-                            variant="outlined"
-                            {...getTagProps({ index })}
-                        />
-                    ))
+                    value.map((option, index) => {
+                        const tagProps = getTagProps({ index });
+                        const { key, ...chipProps } = tagProps;
+
+                        return (
+                            <Chip
+                                key={key} 
+                                label={option}
+                                variant="outlined"
+                                {...chipProps} 
+                            />
+                        );
+                    })
                 }
                 renderInput={(params) => (
                     <TextField
@@ -188,14 +202,14 @@ export default function InputFormContainer() {
                 {loading ? 'Scraping...' : 'Scrape and Download (.csv)'}
             </Button>
 
-            <Snackbar 
-                open={notification.open} 
-                autoHideDuration={6000} 
+            <Snackbar
+                open={notification.open}
+                autoHideDuration={6000}
                 onClose={handleCloseNotification}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
             >
-                <Alert 
-                    onClose={handleCloseNotification} 
+                <Alert
+                    onClose={handleCloseNotification}
                     severity={notification.severity}
                     sx={{ width: '100%' }}
                 >
