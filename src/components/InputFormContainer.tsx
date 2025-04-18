@@ -16,7 +16,7 @@ import {
 import { handleFormSubmit } from "@/utils/formHandlers";
 
 export default function InputFormContainer() {
-    const [site, setSite] = useState('');
+    const [sites, setSites] = useState<string[]>([]);
     const [email, setEmail] = useState<string[]>([]);
     const [profession, setProfession] = useState('');
     const [city, setCity] = useState('');
@@ -30,7 +30,14 @@ export default function InputFormContainer() {
         setLoading(true);
 
         try {
-            const result = await handleFormSubmit({ site, email, profession, city, state, logic });
+            const result = await handleFormSubmit({ 
+                sites, 
+                email, 
+                profession, 
+                city, 
+                state, 
+                logic 
+            });
 
             if (result && result.success) {
                 setNotification({
@@ -90,14 +97,53 @@ export default function InputFormContainer() {
                 borderRadius: 2,
             }}
         >
-            <TextField
-                id="site"
-                label="Site"
-                variant="outlined"
-                value={site}
-                onChange={(e) => setSite(e.target.value)}
-                placeholder="e.g. site:instagram.com"
-                fullWidth
+            <Autocomplete
+                multiple
+                freeSolo
+                options={[]}
+                value={sites}
+                onChange={(event, newValue: string[]) => setSites(newValue)}
+                onInputChange={(event, value) => {
+                    if (value) {
+                        return value;
+                    }
+                    return '';
+                }}
+                onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                        const inputElement = event.target as HTMLInputElement;
+                        if (inputElement.value) {
+                            const newSite = inputElement.value.trim();
+                            if (!sites.includes(newSite)) {
+                                setSites([...sites, newSite]);
+                            }
+                            event.preventDefault();
+                        }
+                    }
+                }}
+                renderTags={(value, getTagProps) =>
+                    value.map((option, index) => {
+                        const tagProps = getTagProps({ index });
+                        const { key, ...chipProps } = tagProps;
+
+                        return (
+                            <Chip
+                                key={key}
+                                label={option}
+                                variant="outlined"
+                                {...chipProps}
+                            />
+                        );
+                    })
+                }
+                renderInput={(params) => (
+                    <TextField
+                        {...params}
+                        variant="outlined"
+                        label="Websites"
+                        placeholder="Type and press enter (e.g. linkedin.com)"
+                    />
+                )}
             />
 
             <Autocomplete
@@ -106,7 +152,7 @@ export default function InputFormContainer() {
                 options={[]}
                 value={email}
                 onChange={(event, newValue: string[]) => setEmail(newValue)}
-                onInputChange={(event, value, reason) => {
+                onInputChange={(event, value) => {
                     if (value) {
                         return value;
                     }
@@ -128,10 +174,10 @@ export default function InputFormContainer() {
 
                         return (
                             <Chip
-                                key={key} 
+                                key={key}
                                 label={option}
                                 variant="outlined"
-                                {...chipProps} 
+                                {...chipProps}
                             />
                         );
                     })
