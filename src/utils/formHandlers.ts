@@ -14,7 +14,6 @@ interface ScraperResponse {
     success: boolean;
     data?: FormData;
     error?: string;
-    htmlContent?: string;
     emails?: string[];
     emailCount?: number;
 }
@@ -53,7 +52,7 @@ function formatData(someData: string): string {
     return someData ? someData.toLowerCase().trim() : '';
 }
 
-export function buildGoogleSearchQuery(data: FormData): string {
+function buildGoogleSearchQuery(data: FormData): string {
     const logic = data.logic?.toUpperCase() === 'AND' ? ' AND ' : ' OR ';
     
     const sitesQuery = data.sites.length > 0 
@@ -75,6 +74,7 @@ export function buildGoogleSearchQuery(data: FormData): string {
 async function scrapeSinglePage(query: string, startIndex: number = 0): Promise<string> {
     const encodedQuery = encodeURIComponent(query);
     const url = `https://www.google.com/search?q=${encodedQuery}&num=100&start=${startIndex}`;
+
     const brightDataApiKey = '3c83fbdd-1797-4769-aa4c-8921171c4098';
     const brightDataZone = 'serp_api1';
 
@@ -89,6 +89,12 @@ async function scrapeSinglePage(query: string, startIndex: number = 0): Promise<
         }
     );
     return response.data;
+}
+
+function extractEmailsFromHtml(html: string): string[] {
+    const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+    const matches = html.match(emailRegex);
+    return matches ? [...new Set(matches)] : [];
 }
 
 export async function scrapeSearchResults(data: FormData): Promise<ScraperResponse> {
@@ -122,7 +128,12 @@ export async function scrapeSearchResults(data: FormData): Promise<ScraperRespon
         }
 
         allEmails = [...new Set(allEmails)];
-        return { success: true, emails: allEmails, emailCount: allEmails.length };
+        return { 
+            success: true, 
+            emails: allEmails, 
+            emailCount: allEmails.length, 
+            data: formatted 
+        };
     } catch (error) {
         console.error("Error scraping search results:", error);
         return {
@@ -130,16 +141,6 @@ export async function scrapeSearchResults(data: FormData): Promise<ScraperRespon
             error: error instanceof Error ? error.message : 'Unknown error occurred'
         };
     }
-}
-
-export function extractEmailsFromHtml(html: string): string[] {
-    const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-    const matches = html.match(emailRegex);
-    return matches ? [...new Set(matches)] : [];
-}
-
-export function emailsToCsv(emails: string[]): string {
-    return `Email\n${emails.join('\n')}`;
 }
 
 export async function handleFormSubmit(data: FormData): Promise<ScraperResponse | undefined> {
@@ -170,17 +171,9 @@ export async function handleFormSubmit(data: FormData): Promise<ScraperResponse 
             };
         }
 
-        const csvContent = emailsToCsv(emails);
-        const blob = new Blob([csvContent], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'scraped_emails.csv';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-
+        const city = formattedData.city || 'N/A';
+        const state = formattedData.state || 'N/A';
+        
         return { 
             success: true, 
             emailCount: emails.length,
