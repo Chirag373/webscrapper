@@ -75,8 +75,8 @@ async function scrapeSinglePage(query: string, startIndex: number = 0): Promise<
     const encodedQuery = encodeURIComponent(query);
     const url = `https://www.google.com/search?q=${encodedQuery}&num=100&start=${startIndex}`;
 
-    const brightDataApiKey = '3c83fbdd-1797-4769-aa4c-8921171c4098';
-    const brightDataZone = 'serp_api1';
+    const brightDataApiKey = '39134f567a78d666ac29d6c0e33e23b2498240742361daffbc7bc141741dcb58'; // <-- Replace with your actual Bright Data API key
+    const brightDataZone = 'serp_api1'; // <-- Replace with your Bright Data zone
 
     const response = await axios.post(
         'https://api.brightdata.com/request',
@@ -170,9 +170,6 @@ export async function handleFormSubmit(data: FormData): Promise<ScraperResponse 
                 error: 'No email addresses found in the search results'
             };
         }
-
-        const city = formattedData.city || 'N/A';
-        const state = formattedData.state || 'N/A';
         
         return { 
             success: true, 
