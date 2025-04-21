@@ -14,3 +14,8 @@
    npm i
    ```
 5. Open the `formHandler.ts` file and update the BrightData API configuration for your use.
+
+6. To run the server through the terminal is using the command:
+   ```
+   npm run dev
+   ```
