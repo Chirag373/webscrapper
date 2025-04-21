@@ -1,0 +1,16 @@
+.navbar {
+    background-color: #f8f9fa;
+    padding: 1rem 0;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .title {
+    margin: 0;
+    font-family: 'Brush Script MT', cursive;
+    font-size: 2rem;
+    color: #333;
+    user-select: none; 
+    pointer-events: none;
+  }
+  
