@@ -75,7 +75,7 @@ async function scrapeSinglePage(query: string, startIndex: number = 0): Promise<
     const encodedQuery = encodeURIComponent(query);
     const url = `https://www.google.com/search?q=${encodedQuery}&num=100&start=${startIndex}`;
 
-    const brightDataApiKey = '39134f567a78d666ac29d6c0e33e23b2498240742361daffbc7bc141741dcb58'; // <-- Replace with your actual Bright Data API key
+    const brightDataApiKey = '5055c705a96be31113dcb656c317fd97e58b1f96c655f5396ca84a3c18a61c7a'; // <-- Replace with your actual Bright Data API key
     const brightDataZone = 'serp_api1'; // <-- Replace with your Bright Data zone
 
     const response = await axios.post(
