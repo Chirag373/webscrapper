@@ -1,12 +1,14 @@
 "use client"
 
-import InputFormContainer from "@/components/InputFormContainer";
 import Navbar from "@/components/Navbar";
+import AutomatedScraperContainer from "@/components/AutomatedScraperContainer";
+
 export default function Home() {
+
   return (
     <div>
       <Navbar />
-      <InputFormContainer />
+      <AutomatedScraperContainer />
     </div>
   );
 }
