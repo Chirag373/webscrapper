@@ -1,27 +1,28 @@
 import axios from 'axios';
+import { FormData, ScraperResponse } from './types';
 
-interface FormData {
-    sites: string[];
-    email: string[];
-    profession: string;
-    city: string;
-    state: string;
-    logic: string;
-    pages?: number;
-}
+// API configuration constants
+const BRIGHTDATA_API_KEY = '5055c705a96be31113dcb656c317fd97e58b1f96c655f5396ca84a3c18a61c7a';
+const BRIGHTDATA_ZONE = 'serp_api1';
+const API_TIMEOUT = 30000; // 30 seconds
+const DEFAULT_PAGES_TO_SCRAPE = 2;
+const SCRAPE_DELAY = 3000; // 3 seconds between successful requests
+const ERROR_DELAY = 5000; // 5 seconds after error
+const EMAIL_SUFFICIENT_THRESHOLD = 30;
 
-interface ScraperResponse {
-    success: boolean;
-    data?: FormData;
-    error?: string;
-    emails?: string[];
-    emailCount?: number;
-}
+// Common email domains that might appear as placeholders
+const COMMON_EMAIL_DOMAINS = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com'];
 
+/**
+ * Creates a delay promise that resolves after specified milliseconds
+ */
 function delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * Formats website URLs into Google search site: queries
+ */
 function formatSites(sites: string[]): string[] {
     return sites.map(site => {
         let formattedSite = site?.toLowerCase().trim() || '';
@@ -38,6 +39,9 @@ function formatSites(sites: string[]): string[] {
     });
 }
 
+/**
+ * Formats email domains to ensure they start with @ symbol
+ */
 function formatEmailAddresses(emails: string[]): string[] {
     return emails.map(email => {
         let formattedEmail = email.toLowerCase().trim();
@@ -48,10 +52,16 @@ function formatEmailAddresses(emails: string[]): string[] {
     });
 }
 
+/**
+ * Generic data formatter that trims and lowercases input
+ */
 function formatData(someData: string): string {
     return someData ? someData.toLowerCase().trim() : '';
 }
 
+/**
+ * Builds a Google search query from the form data
+ */
 function buildGoogleSearchQuery(data: FormData): string {
     const logic = data.logic?.toUpperCase() === 'AND' ? ' AND ' : ' OR ';
     
@@ -71,18 +81,18 @@ function buildGoogleSearchQuery(data: FormData): string {
     return queryParts.join(' ');
 }
 
+/**
+ * Scrapes a single page of Google search results for the given query
+ */
 async function scrapeSinglePage(query: string, startIndex: number = 0): Promise<string> {
     const encodedQuery = encodeURIComponent(query);
     const url = `https://www.google.com/search?q=${encodedQuery}&num=100&start=${startIndex}`;
-
-    const brightDataApiKey = '5055c705a96be31113dcb656c317fd97e58b1f96c655f5396ca84a3c18a61c7a';
-    const brightDataZone = 'serp_api1';
 
     try {
         const response = await axios.post(
             'https://api.brightdata.com/request',
             { 
-                zone: brightDataZone, 
+                zone: BRIGHTDATA_ZONE, 
                 url, 
                 format: 'raw',
                 headers: {
@@ -94,9 +104,9 @@ async function scrapeSinglePage(query: string, startIndex: number = 0): Promise<
             {
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${brightDataApiKey}`
+                    'Authorization': `Bearer ${BRIGHTDATA_API_KEY}`
                 },
-                timeout: 30000 // 30 second timeout
+                timeout: API_TIMEOUT
             }
         );
 
@@ -120,6 +130,41 @@ async function scrapeSinglePage(query: string, startIndex: number = 0): Promise<
     }
 }
 
+/**
+ * Checks if an email appears to be a placeholder pattern
+ */
+function isPlaceholderEmail(email: string): boolean {
+    // Check for patterns like x22@gmail.com
+    if (/^x\d+@(gmail|yahoo|hotmail|outlook)\.com$/i.test(email)) {
+        return true;
+    }
+    
+    // Check the local part of email
+    const [localPart, domain] = email.split('@');
+    
+    // Check for numeric-only usernames
+    if (/^\d+$/.test(localPart)) {
+        return true;
+    }
+    
+    // Check for "test" or "example" emails
+    if (/^(test|example|sample|user|admin)\d*$/i.test(localPart)) {
+        return true;
+    }
+    
+    // Check for common placeholder domain patterns
+    if (domain && COMMON_EMAIL_DOMAINS.some(commonDomain => domain.toLowerCase().includes(commonDomain))) {
+        if (/^x\d+$/i.test(localPart)) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+/**
+ * Extracts valid emails from HTML content
+ */
 function extractEmailsFromHtml(html: string): string[] {
     // Remove HTML encoded characters
     const decodedHtml = html.replace(/u003[ce]/g, '');
@@ -145,12 +190,20 @@ function extractEmailsFromHtml(html: string): string[] {
             return false;
         }
         
+        // Exclude placeholder pattern emails
+        if (isPlaceholderEmail(email)) {
+            return false;
+        }
+        
         // Basic email validation
         const [localPart, domain] = email.split('@');
-        return localPart.length > 1 && domain.length > 3;
+        return localPart && localPart.length > 1 && domain && domain.length > 3;
     });
 }
 
+/**
+ * Scrapes search results using the provided form data
+ */
 export async function scrapeSearchResults(data: FormData): Promise<ScraperResponse> {
     try {
         const formatted = {
@@ -160,7 +213,7 @@ export async function scrapeSearchResults(data: FormData): Promise<ScraperRespon
             city: formatData(data.city),
             state: formatData(data.state),
             logic: data.logic,
-            pages: data.pages || 2 // Reduced to 2 pages for better reliability
+            pages: data.pages || DEFAULT_PAGES_TO_SCRAPE
         };
 
         const query = buildGoogleSearchQuery(formatted);
@@ -175,53 +228,63 @@ export async function scrapeSearchResults(data: FormData): Promise<ScraperRespon
             console.log(`Scraping page ${i + 1}, start index: ${startIndex}`);
             
             let retryCount = 0;
+            let pageEmails: string[] = [];
+            
             while (retryCount < 2) {
                 try {
                     const htmlContent = await scrapeSinglePage(query, startIndex);
-                    const pageEmails = extractEmailsFromHtml(htmlContent);
-                    allEmails = [...allEmails, ...pageEmails];
+                    pageEmails = extractEmailsFromHtml(htmlContent);
+                    
                     console.log(`Found ${pageEmails.length} emails on page ${i + 1}`);
                     
                     if (pageEmails.length === 0) {
                         failedPages++;
                     } else {
                         failedPages = 0;
+                        allEmails = [...allEmails, ...pageEmails];
                     }
                     
                     // Add delay between requests
-                    await delay(3000);
+                    await delay(SCRAPE_DELAY);
                     break;
                     
                 } catch (error) {
-                    console.error(`Error scraping page ${i + 1} (attempt ${retryCount + 1}):`, error);
                     retryCount++;
+                    console.error(`Error scraping page ${i + 1} (attempt ${retryCount}/2):`, error);
                     
                     if (retryCount === 2) {
                         failedPages++;
                     }
                     
                     // Add a longer delay after an error
-                    await delay(5000);
+                    await delay(ERROR_DELAY);
                 }
             }
             
             // If we've found a good number of emails, we can stop early
-            if (allEmails.length > 30) {
-                console.log("Found sufficient emails, stopping early");
+            if (allEmails.length > EMAIL_SUFFICIENT_THRESHOLD) {
+                console.log(`Found sufficient emails (${allEmails.length}), stopping early`);
                 break;
             }
         }
 
-        // Remove duplicates and invalid emails
-        allEmails = [...new Set(allEmails)].filter(email => {
+        // Remove duplicates and apply final validation
+        const uniqueEmails = [...new Set(allEmails)].filter(email => {
             const [localPart, domain] = email.split('@');
-            return localPart.length > 1 && domain.length > 3;
+            
+            // Reject placeholder pattern emails that might have slipped through
+            if (isPlaceholderEmail(email)) {
+                return false;
+            }
+            
+            // Basic validation
+            return localPart && localPart.length > 1 && domain && domain.length > 3;
         });
         
         return { 
             success: true, 
-            emails: allEmails, 
-            emailCount: allEmails.length, 
+            emails: uniqueEmails, 
+            emailCount: uniqueEmails.length, 
             data: formatted 
         };
     } catch (error) {
@@ -233,6 +296,9 @@ export async function scrapeSearchResults(data: FormData): Promise<ScraperRespon
     }
 }
 
+/**
+ * Processes a form submission and returns scraped email results
+ */
 export async function handleFormSubmit(data: FormData): Promise<ScraperResponse | undefined> {
     try {
         // Handle the general search case (empty sites array)
@@ -257,17 +323,22 @@ export async function handleFormSubmit(data: FormData): Promise<ScraperResponse 
         const emails = scraperResponse.emails || [];
         console.log(`Found ${emails.length} unique email addresses across all pages`);
 
-        if (emails.length === 0) {
+        // Final filtering to exclude any remaining placeholder emails
+        const filteredEmails = emails.filter(email => !isPlaceholderEmail(email));
+        
+        console.log(`After additional filtering: ${filteredEmails.length} valid email addresses`);
+
+        if (filteredEmails.length === 0) {
             return {
                 success: false,
-                error: 'No email addresses found in the search results'
+                error: 'No valid email addresses found in the search results'
             };
         }
         
         return { 
             success: true, 
-            emailCount: emails.length,
-            emails: emails
+            emailCount: filteredEmails.length,
+            emails: filteredEmails
         };
     } catch (error) {
         console.error("Error in form submission:", error);
@@ -278,7 +349,9 @@ export async function handleFormSubmit(data: FormData): Promise<ScraperResponse 
     }
 }
 
-// Batch processing helper functions
+/**
+ * Processes a batch of scraping requests across multiple professions, states, and cities
+ */
 export async function processBatch(
     professions: string[],
     states: Record<string, string[]>,
@@ -305,24 +378,24 @@ export async function processBatch(
             results[profession][state] = [];
             
             for (const city of states[state]) {
-                // Update progress
-                progressCallback(
-                    (completedTasks / totalTasks) * 100,
-                    { profession, state, city }
-                );
-                
-                // Perform scraping
-                const formData = {
-                    sites: ['site:google.com'],
-                    email: emailDomains,
-                    profession,
-                    city,
-                    state,
-                    logic: 'OR',
-                    pages: 2
-                };
-                
                 try {
+                    // Update progress
+                    progressCallback(
+                        (completedTasks / totalTasks) * 100,
+                        { profession, state, city }
+                    );
+                    
+                    // Perform scraping
+                    const formData = {
+                        sites: ['site:google.com'],
+                        email: emailDomains,
+                        profession,
+                        city,
+                        state,
+                        logic: 'OR',
+                        pages: DEFAULT_PAGES_TO_SCRAPE
+                    };
+                    
                     const result = await scrapeSearchResults(formData);
                     
                     if (result.success && result.emails && result.emails.length > 0) {
@@ -333,13 +406,12 @@ export async function processBatch(
                     }
                     
                     // Add delay between requests
-                    await delay(3000);
-                    
+                    await delay(SCRAPE_DELAY);
                 } catch (error) {
                     console.error(`Error processing ${profession} in ${city}, ${state}:`, error);
+                } finally {
+                    completedTasks++;
                 }
-                
-                completedTasks++;
             }
         }
     }

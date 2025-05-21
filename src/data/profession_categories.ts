@@ -75,7 +75,7 @@ const professionCategories = [
     "Marketing Agencies",
     "Tutoring Centers",
     "Test Preparation",
-    "Driving Schools",
+    "Driving Instruction",
     "Online Learning",
     "Event Planning",
     "Wedding Services",
