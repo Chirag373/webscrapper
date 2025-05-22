@@ -106,41 +106,72 @@ export default function ScrapingResults({
                         <Typography variant="h6" gutterBottom>Available Downloads</Typography>
                         
                         <List disablePadding>
-                            {recentlyScrapedData.map((data, index) => (
+                            {recentlyScrapedData.map((data, index) => {
+                                // Determine if this is a state-level file (containing all cities)
+                                const isStateFile = !data.cityName;
+                                
+                                return (
                                 <React.Fragment key={`${data.fileName}-${index}`}>
                                     {index > 0 && <Divider />}
                                     <ListItem
                                         sx={{
                                             display: 'flex',
                                             justifyContent: 'space-between',
-                                            py: 1.5
+                                            py: 1.5,
+                                            // Highlight state-level files with a suitable color
+                                            backgroundColor: isStateFile ? 'primary.light' : 'transparent',
+                                            borderRadius: 1,
+                                            '&:hover': {
+                                                backgroundColor: isStateFile ? 'primary.200' : 'action.hover',
+                                            }
                                         }}
                                     >
                                         <Box>
-                                            <Typography variant="body1">
+                                            <Typography 
+                                                variant="body1" 
+                                                component="div"
+                                                sx={{ 
+                                                    fontWeight: isStateFile ? 'bold' : 'regular',
+                                                    color: isStateFile ? 'primary.dark' : 'text.primary'
+                                                }}
+                                            >
                                                 {data.profession} - {data.state}
                                                 {data.cityName && ` (${data.cityName})`}
+                                                {isStateFile && <Chip 
+                                                    size="small" 
+                                                    label="COMPLETE STATE" 
+                                                    color="primary" 
+                                                    sx={{ ml: 1, height: 20, fontSize: '0.7rem' }}
+                                                />}
                                             </Typography>
-                                            <Typography variant="caption" color="text.secondary">
+                                            <Typography 
+                                                variant="caption" 
+                                                color={isStateFile ? 'primary.dark' : 'text.secondary'}
+                                            >
                                                 {data.totalEmailCount} email{data.totalEmailCount !== 1 ? 's' : ''} • {data.date}
                                             </Typography>
                                             {data.cityBreakdown && (
-                                                <Typography variant="caption" color="text.secondary" display="block">
+                                                <Typography 
+                                                    variant="caption" 
+                                                    color={isStateFile ? 'primary.dark' : 'text.secondary'} 
+                                                    display="block"
+                                                >
                                                     {data.cityBreakdown}
                                                 </Typography>
                                             )}
                                         </Box>
                                         <Button
-                                            variant="outlined"
+                                            variant={isStateFile ? "contained" : "outlined"}
                                             size="small"
                                             startIcon={<DownloadIcon />}
                                             onClick={() => handleDownload(data)}
+                                            color={isStateFile ? "primary" : "primary"}
                                         >
                                             Download
                                         </Button>
                                     </ListItem>
                                 </React.Fragment>
-                            ))}
+                            )})}
                         </List>
                     </CardContent>
                 </Card>

@@ -22,8 +22,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Minify output for smaller bundle sizes
-  swcMinify: true,
   // Performance optimization
   compiler: {
     // Remove console.log statements in production

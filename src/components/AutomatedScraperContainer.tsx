@@ -56,6 +56,8 @@ export default function AutomatedScraperContainer() {
         message: '',
         severity: 'success'
     });
+    // Track completed states for auto-download
+    const [completedStates, setCompletedStates] = useState<Map<string, Set<string>>>(new Map());
 
     // Get all states from the imported JSON
     const allStates = Object.keys(usCities);
@@ -128,6 +130,43 @@ export default function AutomatedScraperContainer() {
             window.removeEventListener('error', handleError);
         };
     }, [isRunning]);
+
+    // Detect when a state has completed all cities and auto-download results
+    useEffect(() => {
+        if (!isRunning || !currentTask) return;
+        
+        // Check if we've completed all cities for a state
+        for (const [profession, stateSet] of completedStates.entries()) {
+            for (const state of stateSet) {
+                // Find the state file in recentlyScrapedData
+                const stateFile = recentlyScrapedData.find(data => 
+                    data.profession === profession && 
+                    data.state === state && 
+                    !data.cityName
+                );
+                
+                if (stateFile) {
+                    // Auto download the state file
+                    downloadFile(stateFile.blob, stateFile.fileName);
+                    
+                    // Remove this state from our tracking to prevent multiple downloads
+                    const newCompletedStates = new Map(completedStates);
+                    newCompletedStates.get(profession)?.delete(state);
+                    if (newCompletedStates.get(profession)?.size === 0) {
+                        newCompletedStates.delete(profession);
+                    }
+                    setCompletedStates(newCompletedStates);
+                    
+                    // Notify user
+                    setNotification({
+                        open: true,
+                        message: `Auto-downloaded results for ${profession} in ${state}.`,
+                        severity: 'success'
+                    });
+                }
+            }
+        }
+    }, [recentlyScrapedData, completedStates, isRunning, currentTask]);
 
     // Toggle profession selection
     const toggleProfession = useCallback((profession: string) => {
@@ -234,6 +273,7 @@ export default function AutomatedScraperContainer() {
         setIsRunning(true);
         setCompletedTasks(0);
         setScrapingHistory([]);
+        setCompletedStates(new Map()); // Reset completed states tracking
 
         // Safety check - warn if starting while offline
         if (!navigator.onLine) {
@@ -270,6 +310,21 @@ export default function AutomatedScraperContainer() {
 
         // Process the queue
         const results: { [profession: string]: { [state: string]: EmailWithSource[] } } = {};
+        
+        // Track completed cities per state to determine when a state is fully processed
+        const totalCitiesPerState: { [professionState: string]: { total: number, completed: number } } = {};
+        
+        // Initialize city counters
+        for (const profession of selectedProfessions) {
+            for (const state of selectedStates) {
+                const cities = usCities[state as keyof typeof usCities] || [];
+                const key = `${profession}_${state}`;
+                totalCitiesPerState[key] = {
+                    total: cities.length,
+                    completed: 0
+                };
+            }
+        }
         
         try {
             for (let i = 0; i < scrapingQueue.length; i++) {
@@ -427,6 +482,12 @@ export default function AutomatedScraperContainer() {
                         }
                     }
                     
+                    // Increment completed city counter for this profession-state pair
+                    const stateKey = `${task.profession}_${task.state}`;
+                    if (totalCitiesPerState[stateKey]) {
+                        totalCitiesPerState[stateKey].completed++;
+                    }
+                    
                     // After each city, save current results for each profession-state combination
                     // This creates a continuous save of progress that can be recovered if something goes wrong
                     for (const profession in results) {
@@ -451,9 +512,11 @@ export default function AutomatedScraperContainer() {
                                 // Create main CSV blob with ALL emails, preserving city information
                                 const blob = createCsvBlob(emailsWithSources, profession, state, true);
                                 
-                                // Timestamp for filenames
-                                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                                const fileName = `${profession.replace(/\s+/g, '_')}_${state.replace(/\s+/g, '_')}_all_emails_${timestamp}.csv`;
+                                // Format date and time for filenames
+                                const now = new Date();
+                                const formattedDate = now.toLocaleDateString().replace(/\//g, '-');
+                                const formattedTime = now.toLocaleTimeString().replace(/:/g, '-').replace(/\s/g, '');
+                                const fileName = `${profession.replace(/\s+/g, '_')}_${state.replace(/\s+/g, '_')}_${formattedDate}_${formattedTime}.csv`;
                                 
                                 // Prepare city breakdown text for display
                                 const cityBreakdown = Object.keys(cityEmails)
@@ -495,8 +558,11 @@ export default function AutomatedScraperContainer() {
                                         // Create city-specific blob
                                         const cityBlob = createCsvBlob(cityEmailList, profession, state, true, cityName);
                                         
-                                        // City-specific filename
-                                        const cityFileName = `${profession.replace(/\s+/g, '_')}_${state.replace(/\s+/g, '_')}_${cityName.replace(/\s+/g, '_')}_emails_${timestamp}.csv`;
+                                        // Format date and time for city-specific filenames
+                                        const now = new Date();
+                                        const formattedDate = now.toLocaleDateString().replace(/\//g, '-');
+                                        const formattedTime = now.toLocaleTimeString().replace(/:/g, '-').replace(/\s/g, '');
+                                        const cityFileName = `${profession.replace(/\s+/g, '_')}_${state.replace(/\s+/g, '_')}_${cityName.replace(/\s+/g, '_')}_${formattedDate}_${formattedTime}.csv`;
                                         
                                         // Add city-specific file to recently scraped data
                                         const cityData: ScrapedData = {
@@ -524,6 +590,23 @@ export default function AutomatedScraperContainer() {
                                 
                                 // Save temporary data for recovery if needed
                                 saveTemporaryResults(profession, state, emailsWithSources);
+                                
+                                // Check if the state is fully processed
+                                const key = `${profession}_${state}`;
+                                if (totalCitiesPerState[key] && 
+                                    totalCitiesPerState[key].completed === totalCitiesPerState[key].total) {
+                                    // Add to completed states for auto-download
+                                    setCompletedStates(prev => {
+                                        const newMap = new Map(prev);
+                                        if (!newMap.has(profession)) {
+                                            newMap.set(profession, new Set());
+                                        }
+                                        newMap.get(profession)?.add(state);
+                                        return newMap;
+                                    });
+                                    
+                                    console.log(`State ${state} for ${profession} is complete and ready for auto-download`);
+                                }
                             }
                         }
                     }
