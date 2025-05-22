@@ -19,3 +19,6 @@
    ```
    npm run dev
    ```
+
+<img width="1709" alt="Screenshot 2025-05-22 at 1 07 40 PM" src="https://github.com/user-attachments/assets/90fdd500-5df4-470a-925c-2c2402eeba14" />
+
