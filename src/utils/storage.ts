@@ -9,24 +9,27 @@ export function createCsvBlob(
     profession: string,
     state: string,
     includeSource: boolean = true,
-    cityName?: string
+    cityName?: string,
+    emailCityMap?: Map<string, { city: string, source: string }>
 ): Blob {
     // Create CSV header
     let header = includeSource 
-        ? 'Email,Source,Profession,State' 
-        : 'Email,Profession,State';
-    
-    if (cityName) header += ',City';
+        ? 'Email,Source,Profession,State,City' 
+        : 'Email,Profession,State,City';
     
     const rows = [header];
     
     // Add each email as a row
     emailsWithSource.forEach(({ email, source }) => {
+        // Try to get city from emailCityMap if available
+        let city = cityName || '';
+        if (emailCityMap && emailCityMap.has(email)) {
+            city = emailCityMap.get(email)?.city || '';
+        }
+        
         let row = includeSource
-            ? `${email},${source},${profession},${state}`
-            : `${email},${profession},${state}`;
-            
-        if (cityName) row += `,${cityName}`;
+            ? `${email},${source},${profession},${state},${city}`
+            : `${email},${profession},${state},${city}`;
         
         rows.push(row);
     });
@@ -107,7 +110,8 @@ export function loadRecoveredData(
             const blob = createCsvBlob(
                 recoveredData.emails, 
                 recoveredData.profession, 
-                recoveredData.state
+                recoveredData.state,
+                true
             );
             
             // Create a timestamp for the filename

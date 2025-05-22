@@ -510,7 +510,7 @@ export default function AutomatedScraperContainer() {
                                 }
                                 
                                 // Create main CSV blob with ALL emails, preserving city information
-                                const blob = createCsvBlob(emailsWithSources, profession, state, true);
+                                const blob = createCsvBlob(emailsWithSources, profession, state, true, undefined, emailCityMap);
                                 
                                 // Format date and time for filenames
                                 const now = new Date();
